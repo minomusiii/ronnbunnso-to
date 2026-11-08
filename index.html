@@ -129,6 +129,12 @@
           <span id="aiLoadingText">PDFから本文を読み取ってAI解析中...</span>
         </div>
 
+        <!-- 解析成功メッセージ -->
+        <div id="aiSuccessBox" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2">
+          <i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>
+          <span id="aiSuccessText">AI解析が完了しました！内容を確認して「保存する」を押してください。</span>
+        </div>
+
         <!-- エラー詳細表示ボックス -->
         <div id="aiErrorBox" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-xs space-y-1">
           <div class="font-bold flex items-center gap-1.5 text-sm">
@@ -279,7 +285,7 @@
           <label class="block text-xs font-bold text-slate-700 mb-1">Gemini APIキー（PDF自動解析用）</label>
           <input id="apiKeyInput" type="password" placeholder="AIzaSy..." oninput="autoSaveApiKey()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
           <p class="text-[11px] text-slate-500 mt-1">※入力すると自動で保存されます。お使いの端末内にのみ保管されます。</p>
-          <button onclick="saveApiKey()" class="mt-2 bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg">APIキーを保存・確認</button>
+          <button onclick="saveApiKey()" class="mt-2 bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg">APIキーを保存・接続確認</button>
         </div>
 
         <hr class="border-slate-200">
@@ -319,6 +325,7 @@
     let pendingFullText = '';
     let activePdfDoc = null;
     let currentPdfScale = 1.3;
+    let cachedModelNames = null;
 
     function openPdfDB() {
       return new Promise((resolve, reject) => {
@@ -385,7 +392,6 @@
       } catch (e) {}
     }
 
-    // APIキー取得（前後の空白や改行を自動除去）
     function getCleanApiKey() {
       const raw = document.getElementById('apiKeyInput')?.value || localStorage.getItem(API_KEY_STORAGE) || localStorage.getItem('gemini_api_key') || '';
       return raw.replace(/\s+/g, '');
@@ -393,7 +399,10 @@
 
     function autoSaveApiKey() {
       const key = document.getElementById('apiKeyInput').value.replace(/\s+/g, '');
-      if (key) localStorage.setItem(API_KEY_STORAGE, key);
+      if (key) {
+        localStorage.setItem(API_KEY_STORAGE, key);
+        cachedModelNames = null;
+      }
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
@@ -661,7 +670,6 @@
       renderAll();
     }
 
-    // ArrayBuffer -> Base64 変換（スキャンPDFや文字抽出不能PDFの直接AI送信対応）
     function arrayBufferToBase64(buffer) {
       let binary = '';
       const bytes = new Uint8Array(buffer);
@@ -672,7 +680,7 @@
       return btoa(binary);
     }
 
-    // AI応答テキストから安全にJSONオブジェクトを取り出す
+    // 改行やコードブロックが混ざっていても絶対に壊れないJSONパーサー
     function parseAiJsonSafely(rawText) {
       if (!rawText) throw new Error('AIからの応答が空でした。');
       let cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -681,14 +689,112 @@
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         cleaned = cleaned.slice(firstBrace, lastBrace + 1);
       }
-      const parsed = JSON.parse(cleaned);
-      return Array.isArray(parsed) ? parsed[0] : parsed;
+
+      try {
+        const parsed = JSON.parse(cleaned);
+        return Array.isArray(parsed) ? parsed[0] : parsed;
+      } catch (e1) {
+        // 文字列内の生改行やタブをエスケープして再試行
+        let fixed = '';
+        let inString = false;
+        let escaped = false;
+        for (let i = 0; i < cleaned.length; i++) {
+          const ch = cleaned[i];
+          if (escaped) {
+            fixed += ch;
+            escaped = false;
+            continue;
+          }
+          if (ch === '\\') {
+            fixed += ch;
+            escaped = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = !inString;
+            fixed += ch;
+            continue;
+          }
+          if (inString && (ch === '\n' || ch === '\r')) {
+            fixed += '\\n';
+            continue;
+          }
+          if (inString && ch === '\t') {
+            fixed += ' ';
+            continue;
+          }
+          fixed += ch;
+        }
+        fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+        const parsed2 = JSON.parse(fixed);
+        return Array.isArray(parsed2) ? parsed2[0] : parsed2;
+      }
     }
 
-    // 複数モデル自動フォールバック付き Gemini API 呼び出し
+    // ListModels APIを呼んで現在使えるモデル一覧を自動取得する
+    async function getAvailableGeminiModels(apiKey) {
+      if (cachedModelNames && cachedModelNames.length > 0) return cachedModelNames;
+      const defaultModels = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const data = await res.json();
+        if (!res.ok || !data.models) return defaultModels;
+
+        const supported = data.models
+          .filter(m => {
+            const methods = m.supportedGenerationMethods || [];
+            const name = (m.name || '').toLowerCase();
+            if (!methods.includes('generateContent')) return false;
+            if (!name.includes('gemini')) return false;
+            if (name.includes('embedding') || name.includes('imagen') || name.includes('veo') || name.includes('tts') || name.includes('audio') || name.includes('vision') || name.includes('aqa') || name.includes('robotics') || name.includes('computer-use')) return false;
+            return true;
+          })
+          .map(m => m.name.replace(/^models\//, ''));
+
+        if (supported.length === 0) return defaultModels;
+
+        // 優先順位で並び替え（2.5-flash系 -> flash系 -> pro系）
+        const scoreModel = (name) => {
+          if (name === 'gemini-2.5-flash') return 100;
+          if (name.startsWith('gemini-2.5-flash') && !name.includes('lite')) return 95;
+          if (name === 'gemini-flash-latest') return 90;
+          if (name.startsWith('gemini-3') && name.includes('flash')) return 88;
+          if (name === 'gemini-2.0-flash') return 85;
+          if (name.includes('flash')) return 75;
+          if (name.includes('pro')) return 60;
+          return 10;
+        };
+
+        supported.sort((a, b) => scoreModel(b) - scoreModel(a));
+        cachedModelNames = supported.slice(0, 5);
+        return cachedModelNames;
+      } catch (e) {
+        return defaultModels;
+      }
+    }
+
+    // 型固定（responseSchema）＆自動モデル選択付き Gemini API 呼び出し
     async function callGeminiWithFallback(apiKey, parts) {
-      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
-      let lastErrorMsg = '';
+      const models = await getAvailableGeminiModels(apiKey);
+      const errors = [];
+
+      const responseSchema = {
+        type: "OBJECT",
+        properties: {
+          title: { type: "STRING" },
+          mainCat: { type: "STRING" },
+          subCat: { type: "STRING" },
+          meta: { type: "STRING" },
+          tags: { type: "ARRAY", items: { type: "STRING" } },
+          summary: { type: "STRING" },
+          participants: { type: "STRING" },
+          intervention: { type: "STRING" },
+          results: { type: "STRING" },
+          discussion: { type: "STRING" }
+        },
+        required: ["title", "mainCat", "subCat", "summary", "participants", "intervention", "results", "discussion"]
+      };
 
       for (const model of models) {
         try {
@@ -699,7 +805,8 @@
               contents: [{ parts }],
               generationConfig: {
                 temperature: 0.2,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                responseSchema: responseSchema
               }
             })
           });
@@ -708,24 +815,27 @@
 
           if (!response.ok || data.error) {
             const msg = data?.error?.message || `HTTP ${response.status}`;
-            lastErrorMsg = `[${model}] ${msg}`;
-            // APIキー自体が無効な場合は即座にループ終了
             if (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid')) {
               throw new Error('APIキーが正しくありません。右上の歯車マークからAPIキーを再確認してください。');
             }
+            errors.push(`[${model}] ${msg}`);
             continue;
           }
 
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const candidateParts = data?.candidates?.[0]?.content?.parts || [];
+          const rawText = candidateParts
+            .filter(p => !p.thought && typeof p.text === 'string')
+            .map(p => p.text)
+            .join('\n') || candidateParts[0]?.text || '';
+
           return parseAiJsonSafely(rawText);
         } catch (err) {
-          lastErrorMsg = err.message || String(err);
-          if (lastErrorMsg.includes('APIキーが正しくありません')) {
-            throw err;
-          }
+          const msg = err.message || String(err);
+          if (msg.includes('APIキーが正しくありません')) throw err;
+          errors.push(`[${model}] ${msg}`);
         }
       }
-      throw new Error(lastErrorMsg || 'すべてのAIモデルで通信に失敗しました。');
+      throw new Error(errors[0] || 'AIモデルとの通信に失敗しました。');
     }
 
     // PDFの読み込み＆Gemini APIによる要約＋4項目自動抽出
@@ -738,8 +848,10 @@
       const loadingText = document.getElementById('aiLoadingText');
       const errorBox = document.getElementById('aiErrorBox');
       const errorText = document.getElementById('aiErrorText');
+      const successBox = document.getElementById('aiSuccessBox');
 
       errorBox.classList.add('hidden');
+      successBox.classList.add('hidden');
       loadingBox.classList.remove('hidden');
       loadingText.textContent = 'PDF本体をアプリに読み込み中...';
 
@@ -751,7 +863,6 @@
         const arrayBuffer = await file.arrayBuffer();
         pendingPdfBuffer = arrayBuffer.slice(0);
 
-        // 日本語フォント対応（CMap）付きでPDFからテキスト抽出
         let extractedText = '';
         try {
           const pdf = await pdfjsLib.getDocument({
@@ -764,7 +875,8 @@
           for (let i = 1; i <= maxPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            extractedText += `--- Page ${i} ---\n` + content.items.map(item => item.str).join(' ') + '\n\n';
+            const pageStr = content.items.map(item => item.str).join(' ').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+            extractedText += `--- Page ${i} ---\n` + pageStr + '\n\n';
           }
         } catch (pdfErr) {
           console.warn('PDFテキスト抽出スキップ（直接AI送信へ切り替え）:', pdfErr);
@@ -780,33 +892,30 @@
           return;
         }
 
-        loadingText.textContent = 'AIが「全体の要約・対象者・実施内容・結果・考察」を解析中...';
+        loadingText.textContent = '使える最新AIモデルを自動選択して「要約・対象・方法・結果・考察」を解析中...';
 
         const promptText = `
-以下の医学・理学療法・リハビリテーション等の学術論文を解析し、必ず以下のJSON形式のみで日本語で出力してください。
-
-{
-  "title": "論文の分かりやすい日本語タイトル（英語論文の場合は日本語訳＋原題）",
-  "mainCat": "大分類（例：神経系理学療法、運動器系理学療法、内部障害系、基礎医学、装具・福祉用具など）",
-  "subCat": "小分類（例：脳卒中、パーキンソン病、変形性膝関節症、呼吸リハなど）",
-  "meta": "第一著者名と発表年（例：Tanaka et al., 2024）",
-  "tags": ["重要キーワード1", "キーワード2", "キーワード3", "キーワード4"],
-  "summary": "論文全体の要約（この研究の目的・方法・結論がひと目でわかる2〜3文の簡潔な全体要約）",
-  "participants": "対象者（対象疾患、人数、年齢、群分け、除外基準などを具体的に）",
-  "intervention": "何を実施したか（介入方法、運動プロトコル、頻度・期間、評価指標・測定方法などを具体的に）",
-  "results": "結果（主要なアウトカムの変化、数値、群間差や統計的有意差などを具体的に）",
-  "discussion": "考察（結果が得られたメカニズム、臨床的意義、研究の限界・今後の課題などを簡潔に）"
-}
+あなたは医学・看護・理学療法・リハビリテーション分野の専門リサーチャーです。
+与えられた学術論文の内容を解析し、指定されたJSONフォーマットで日本語で出力してください。
+- title: 論文の分かりやすい日本語タイトル（英語論文の場合は日本語訳＋原題）
+- mainCat: 大分類（例：小児科学・看護、神経系理学療法、運動器系、内部障害系、基礎医学など）
+- subCat: 小分類（例：小児リウマチ、脳卒中、変形性関節症、呼吸リハなど）
+- meta: 著者名と発表年（例：山田ほか, 2024 / Tanaka et al., 2024）
+- tags: 重要キーワード3〜5個の配列
+- summary: 論文全体の要約（研究の目的・方法・結論がひと目でわかる2〜3文の要約）
+- participants: ①対象者（対象疾患、人数、年齢、群分け、条件などを具体的に）
+- intervention: ②実施内容（何を実施したか、調査・介入・看護・リハの方法、期間、評価指標などを具体的に）
+- results: ③結果（どうなったか、主要な結果、数値、統計的有意差などを具体的に）
+- discussion: ④考察（なぜそうなったか、臨床的意義、今後の課題などを簡潔に）
         `.trim();
 
         let parts = [];
         const cleanExtracted = extractedText.replace(/--- Page \d+ ---/g, '').trim();
 
-        // テキストが十分に抽出できた場合はテキスト送信、スキャンPDF等で文字が少ない場合はPDF原本を直接送信
         if (cleanExtracted.length > 200) {
           parts = [{ text: promptText + "\n\n論文テキスト:\n" + extractedText.slice(0, 28000) }];
         } else if (pendingPdfBuffer.byteLength < 18 * 1024 * 1024) {
-          loadingText.textContent = 'スキャンPDFまたは特殊フォントを検出：PDF原本を直接AIで読み取っています...';
+          loadingText.textContent = 'PDF原本を直接AIで読み取って解析しています...';
           const base64Pdf = arrayBufferToBase64(pendingPdfBuffer);
           parts = [
             { inlineData: { mimeType: 'application/pdf', data: base64Pdf } },
@@ -829,6 +938,7 @@
         document.getElementById('formResults').value = result.results || '';
         document.getElementById('formDiscussion').value = result.discussion || '';
 
+        successBox.classList.remove('hidden');
       } catch (err) {
         console.error(err);
         errorBox.classList.remove('hidden');
@@ -950,6 +1060,7 @@
       pendingPdfBuffer = null;
       pendingFullText = '';
       document.getElementById('aiErrorBox').classList.add('hidden');
+      document.getElementById('aiSuccessBox').classList.add('hidden');
       document.getElementById('editPaperId').value = '';
       document.getElementById('pdfFileInput').value = '';
       document.getElementById('pdfStatusText').textContent = 'PDF本体もアプリ内に保存され、いつでもアプリ内で読めるようになります';
@@ -974,11 +1085,12 @@
       pendingPdfBuffer = null;
       pendingFullText = p.fullText || '';
       document.getElementById('aiErrorBox').classList.add('hidden');
+      document.getElementById('aiSuccessBox').classList.add('hidden');
       document.getElementById('editPaperId').value = p.id;
       document.getElementById('pdfFileInput').value = '';
       document.getElementById('pdfStatusText').textContent = pdfSavedMap[p.id]
-        ? '✓ PDF原本は保存済みです（別のPDFに差し替える場合のみ再選択してください）'
-        : 'PDFファイルを選択すると、この論文にPDF原本を追加保存できます';
+        ? '✓ PDF原本は保存済みです（もう一度PDFを選ぶとAI再解析＆差し替えができます）'
+        : 'PDFファイルを選択すると、AI自動解析とPDF原本の保存ができます';
       document.getElementById('formTitle').value = p.title || '';
       document.getElementById('formMainCat').value = p.mainCat || '';
       document.getElementById('formSubCat').value = p.subCat || '';
@@ -1066,10 +1178,16 @@
       document.getElementById('settingsModal').classList.remove('flex');
     }
 
-    function saveApiKey() {
+    async function saveApiKey() {
       const key = document.getElementById('apiKeyInput').value.replace(/\s+/g, '');
       localStorage.setItem(API_KEY_STORAGE, key);
-      alert(key ? 'APIキーを保存しました！' : 'APIキーが空欄です。');
+      cachedModelNames = null;
+      if (!key) {
+        alert('APIキーが空欄です。');
+        return;
+      }
+      const models = await getAvailableGeminiModels(key);
+      alert(`APIキーを保存しました！\n接続確認OK（使用モデル: ${models[0]}）`);
     }
 
     function exportData() {
