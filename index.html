@@ -1,774 +1,1015 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PaperSphere - iPad対応・AI自動分類論文管理</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts: Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- PDF.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    </script>
-    <!-- iOS / iPad WebApp Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="PaperSphere">
-    <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PaperSphere - 論文管理＆AI解析</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background-color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="text-slate-800 min-h-screen flex flex-col">
 
-    <!-- Header -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-indigo-600 text-white p-2.5 rounded-2xl shadow-md flex items-center justify-center">
-                    <i class="fa-solid fa-book-open-reader text-lg"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                        PaperSphere
-                    </h1>
-                    <p class="text-[10px] text-slate-400 font-medium">iPad & AI Paper Manager</p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2.5 rounded-2xl text-sm font-medium transition shadow-sm hover:shadow flex items-center space-x-2">
-                    <i class="fa-solid fa-plus"></i>
-                    <span>論文を追加</span>
-                </button>
-            </div>
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 py-3 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm">
+          <i class="fa-solid fa-book-medical text-lg"></i>
         </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        <!-- Sidebar (Filters, Categories & Tags) -->
-        <aside class="space-y-4 lg:col-span-1">
-            <!-- Search Bar -->
-            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">キーワード検索</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <i class="fa-solid fa-search"></i>
-                    </span>
-                    <input type="text" id="searchInput" oninput="filterPapers()" placeholder="タイトル、著者、メモ..." 
-                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                </div>
-            </div>
-
-            <!-- Sort Options -->
-            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">並び替え</label>
-                <select id="sortSelect" onchange="filterPapers()" 
-                    class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                    <option value="newest">新しい登録順</option>
-                    <option value="oldest">古い登録順</option>
-                    <option value="title">タイトル順 (A-Z)</option>
-                </select>
-            </div>
-
-            <!-- Category & Disease Tree Filter -->
-            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">大カテゴリ・疾患別</label>
-                    <button onclick="resetFilters()" class="text-xs text-indigo-600 font-medium hover:underline">すべて表示</button>
-                </div>
-                <div id="categoryFilterList" class="space-y-2.5 max-h-64 overflow-y-auto pr-1">
-                    <!-- Dynamic Category/Disease Tree -->
-                </div>
-            </div>
-
-            <!-- Tag Filter -->
-            <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">タグで絞り込み</label>
-                    <button onclick="resetTagFilter()" class="text-xs text-indigo-600 font-medium hover:underline">クリア</button>
-                </div>
-                <div id="tagFilterList" class="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-                    <!-- Dynamic Tags -->
-                </div>
-            </div>
-        </aside>
-
-        <!-- Paper List Section -->
-        <section class="lg:col-span-3 space-y-4">
-            <div class="flex items-center justify-between bg-white px-5 py-3.5 rounded-3xl border border-slate-200 shadow-sm">
-                <h2 class="text-sm font-bold text-slate-700" id="paperCountHeading">論文一覧 (0件)</h2>
-                <div id="activeFilterBadge" class="hidden flex items-center space-x-2 text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-2xl font-medium">
-                    <span id="filterBadgeText"></span>
-                    <button onclick="resetFilters()" class="hover:text-indigo-900"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-            </div>
-            
-            <div id="paperList" class="space-y-4">
-                <!-- Dynamic Paper Cards -->
-            </div>
-
-            <!-- Empty State -->
-            <div id="emptyState" class="hidden text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
-                <div class="text-slate-300 text-5xl mb-3">
-                    <i class="fa-solid fa-folder-open"></i>
-                </div>
-                <p class="text-slate-700 font-semibold text-base">該当する論文がありません</p>
-                <p class="text-slate-400 text-xs mt-1">「論文を追加」からPDFを読み込ませて自動分類させましょう。</p>
-            </div>
-        </section>
-    </main>
-
-    <!-- Modal for Add/Edit Paper -->
-    <div id="paperModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-[2rem] max-w-2xl w-full p-6 sm:p-8 shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
-                <div>
-                    <h3 id="modalTitle" class="text-xl font-bold text-slate-800">論文を登録</h3>
-                    <p class="text-xs text-slate-400 mt-0.5">PDFファイルを読み込ませるだけでAIが自動解析します</p>
-                </div>
-                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 transition p-2 rounded-xl hover:bg-slate-100">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <!-- PDF / File AI Auto-Import Box -->
-            <div class="mb-6 bg-gradient-to-br from-indigo-50 to-violet-50 p-5 rounded-3xl border border-indigo-100 space-y-3">
-                <div class="flex items-center space-x-2 text-indigo-900 font-semibold text-sm">
-                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i>
-                    <span>PDF・テキストファイルから一括自動解析</span>
-                </div>
-                <div class="flex flex-col sm:flex-row items-center gap-3">
-                    <label class="w-full flex-1 cursor-pointer bg-white hover:bg-indigo-50 text-indigo-700 font-medium px-4 py-3 rounded-2xl border border-indigo-200 transition shadow-sm flex items-center justify-center space-x-2 text-sm">
-                        <i class="fa-solid fa-file-pdf text-rose-500 text-base"></i>
-                        <span id="fileLabelText">PDFまたはテキストファイルを選択...</span>
-                        <input type="file" id="pdfFileInput" accept=".pdf,.txt" onchange="handleFileSelected(event)" class="hidden">
-                    </label>
-                    <button type="button" id="aiParseBtn" onclick="executeAIParse()" disabled
-                        class="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-semibold text-sm transition shadow-sm flex items-center justify-center space-x-2 shrink-0">
-                        <i class="fa-solid fa-brain"></i>
-                        <span>AI自動分類を実行</span>
-                    </button>
-                </div>
-                <p id="parseStatusText" class="text-xs text-indigo-600 hidden font-medium text-center"></p>
-            </div>
-
-            <form id="paperForm" onsubmit="savePaper(event)" class="space-y-4">
-                <input type="hidden" id="paperId">
-
-                <!-- Category & Disease -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">大カテゴリ <span class="text-rose-500">*</span></label>
-                        <input type="text" id="categoryInput" required list="categorySuggestions" placeholder="例: 整形外科疾患" 
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                        <datalist id="categorySuggestions"></datalist>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">疾患別 <span class="text-rose-500">*</span></label>
-                        <input type="text" id="diseaseInput" required list="diseaseSuggestions" placeholder="例: 骨折" 
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                        <datalist id="diseaseSuggestions"></datalist>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">タイトル <span class="text-rose-500">*</span></label>
-                    <input type="text" id="titleInput" required placeholder="論文のタイトル..." 
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">著者 <span class="text-rose-500">*</span></label>
-                    <input type="text" id="authorsInput" required placeholder="例: Smith JA, et al." 
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">アブストラクト（概要）</label>
-                    <textarea id="abstractInput" rows="3" placeholder="アブストラクトを入力..." 
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"></textarea>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">PDFリンク・URL</label>
-                        <input type="url" id="pdfUrlInput" placeholder="https://doi.org/..." 
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">タグ (カンマ区切り)</label>
-                        <input type="text" id="tagsInput" placeholder="手術, 予後, プレート固定" 
-                            class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">メモ・考察</label>
-                    <textarea id="memoInput" rows="2" placeholder="臨床的な気づきなど..." 
-                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition"></textarea>
-                </div>
-
-                <div class="flex justify-end space-x-3 pt-4 border-t border-slate-100">
-                    <button type="button" onclick="closeModal()" class="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">
-                        キャンセル
-                    </button>
-                    <button type="submit" class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-semibold transition shadow-sm hover:shadow">
-                        保存する
-                    </button>
-                </div>
-            </form>
+        <div>
+          <h1 class="font-bold text-lg leading-tight text-slate-900">PaperSphere</h1>
+          <p class="text-xs text-slate-500">AI論文要約＆アプリ内リーダー</p>
         </div>
+      </div>
+
+      <!-- 検索バー -->
+      <div class="flex-1 max-w-md mx-2">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input id="searchInput" type="text" placeholder="タイトル・要約・対象・結果・タグで検索..."
+            class="w-full pl-9 pr-4 py-2 text-sm bg-slate-100 border border-transparent rounded-xl focus:bg-white focus:border-indigo-500 focus:outline-none transition">
+        </div>
+      </div>
+
+      <!-- 操作ボタン群 -->
+      <div class="flex items-center gap-2">
+        <button onclick="openUploadModal()" class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-sm font-medium px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-file-circle-plus"></i>
+          <span>論文追加</span>
+        </button>
+        <button onclick="openSettingsModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded-xl transition" title="API設定・データ管理">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
     </div>
+  </header>
 
-    <!-- Custom Delete Confirmation Modal -->
-    <div id="deleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 text-center">
-            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
-                <i class="fa-solid fa-trash-can"></i>
+  <!-- メインコンテンツ -->
+  <div class="flex-1 max-w-7xl w-full mx-auto flex flex-col md:flex-row gap-4 p-4">
+
+    <!-- 左サイドバー：カテゴリ＆タグフィルタ -->
+    <aside class="w-full md:w-64 shrink-0 space-y-4">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-sm text-slate-700 flex items-center gap-1.5">
+            <i class="fa-solid fa-folder-tree text-indigo-500"></i> カテゴリ分類
+          </h2>
+          <span id="totalCountBadge" class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">0件</span>
+        </div>
+        <div id="categoryList" class="space-y-1 text-sm max-h-60 md:max-h-80 overflow-y-auto custom-scroll"></div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="font-bold text-sm text-slate-700 flex items-center gap-1.5 mb-3">
+          <i class="fa-solid fa-tags text-indigo-500"></i> タグ一覧
+        </h2>
+        <div id="tagCloud" class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto custom-scroll"></div>
+      </div>
+    </aside>
+
+    <!-- 右メイン：論文カード一覧 -->
+    <main class="flex-1">
+      <div id="activeFilterBar" class="hidden mb-3 flex items-center justify-between bg-indigo-50 border border-indigo-100 px-3.5 py-2 rounded-xl text-xs text-indigo-700">
+        <span id="activeFilterText" class="font-medium"></span>
+        <button onclick="resetFilter()" class="underline hover:text-indigo-900">フィルタ解除</button>
+      </div>
+
+      <div id="paperGrid" class="grid grid-cols-1 gap-4"></div>
+
+      <!-- 論文が0件のとき -->
+      <div id="emptyState" class="hidden bg-white rounded-2xl border border-dashed border-slate-300 p-10 text-center my-4">
+        <div class="w-14 h-14 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+          <i class="fa-solid fa-file-pdf"></i>
+        </div>
+        <h3 class="font-bold text-slate-700 mb-1">まだ論文が登録されていません</h3>
+        <p class="text-xs text-slate-500 mb-4">右上の「論文追加」からPDFを読み込むと、<br>全体の要約・対象者・実施内容・結果・考察をAIが整理し、アプリ内でPDFも読めます。</p>
+        <button onclick="openUploadModal()" class="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-sm">
+          最初の論文を追加する
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- モーダル1：論文追加＆PDF自動解析 -->
+  <div id="uploadModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> 論文の追加・AI自動解析
+        </h3>
+        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-slate-600 text-lg px-2">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto custom-scroll space-y-4">
+        <!-- PDF選択エリア -->
+        <label class="block border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 rounded-2xl p-4 text-center cursor-pointer transition">
+          <input id="pdfFileInput" type="file" accept="application/pdf" class="hidden" onchange="handlePdfSelect(event)">
+          <i class="fa-solid fa-cloud-arrow-up text-2xl text-indigo-500 mb-1"></i>
+          <p class="text-sm font-bold text-slate-700">PDFファイルをタップして選択</p>
+          <p id="pdfStatusText" class="text-xs text-slate-500 mt-1">PDF本体もアプリ内に保存され、いつでもアプリ内で読めるようになります</p>
+        </label>
+
+        <!-- AI解析ステータス -->
+        <div id="aiLoadingBox" class="hidden bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-3 rounded-xl text-sm flex items-center gap-3">
+          <i class="fa-solid fa-circle-notch fa-spin text-lg"></i>
+          <span id="aiLoadingText">PDFから本文を読み取ってAI解析中...</span>
+        </div>
+
+        <!-- 編集・確認フォーム -->
+        <div class="space-y-3 pt-1">
+          <input type="hidden" id="editPaperId">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">論文タイトル *</label>
+            <input id="formTitle" type="text" placeholder="例：脳卒中片麻痺患者に対する〇〇トレーニングの効果" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1">大カテゴリ（分野）</label>
+              <input id="formMainCat" type="text" placeholder="例：神経系理学療法" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
             </div>
             <div>
-                <h4 class="text-base font-bold text-slate-800">論文を削除しますか？</h4>
-                <p class="text-xs text-slate-400 mt-1">この操作は取り消せません。</p>
+              <label class="block text-xs font-bold text-slate-600 mb-1">小カテゴリ（疾患・テーマ）</label>
+              <input id="formSubCat" type="text" placeholder="例：脳卒中・歩行" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
             </div>
-            <div class="flex space-x-3 pt-2">
-                <button onclick="closeDeleteModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium transition">キャンセル</button>
-                <button id="confirmDeleteBtn" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition">削除する</button>
+            <div>
+              <label class="block text-xs font-bold text-slate-600 mb-1">著者・発表年</label>
+              <input id="formMeta" type="text" placeholder="例：Suzuki et al. (2025)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
             </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">タグ（カンマ区切り）</label>
+            <input id="formTags" type="text" placeholder="例：RCT, 歩行速度, 脳卒中, リハビリ" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
+          </div>
+
+          <!-- 論文全体の要約 -->
+          <div class="bg-indigo-50/60 p-3 rounded-xl border border-indigo-100">
+            <label class="block text-xs font-bold text-indigo-900 mb-1">
+              <i class="fa-solid fa-file-lines mr-1 text-indigo-600"></i>論文全体の要約（ざっくり言うとどんな研究？）
+            </label>
+            <textarea id="formSummary" rows="2" placeholder="例：回復期脳卒中患者に対し課題指向型練習を行い、歩行速度とバランス能力の有意な改善を示したランダム化比較試験。" class="w-full p-2 text-sm bg-white border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-500"></textarea>
+          </div>
+
+          <!-- 4大項目：対象者・実施内容・結果・考察 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div class="bg-blue-50/60 p-3 rounded-xl border border-blue-100">
+              <label class="block text-xs font-bold text-blue-800 mb-1">
+                <i class="fa-solid fa-users mr-1"></i>① 対象者（誰に・何人・条件）
+              </label>
+              <textarea id="formParticipants" rows="3" placeholder="例：回復期脳卒中患者40名（介入群20名、対照群20名、平均年齢68歳）" class="w-full p-2 text-sm bg-white border border-blue-200 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <div class="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100">
+              <label class="block text-xs font-bold text-emerald-800 mb-1">
+                <i class="fa-solid fa-person-walking mr-1"></i>② 実施内容（何をしたか・方法・期間）
+              </label>
+              <textarea id="formIntervention" rows="3" placeholder="例：通常リハに加え、週5回×4週間の課題指向型バランストレーニング（1回30分）を実施" class="w-full p-2 text-sm bg-white border border-emerald-200 rounded-lg focus:outline-none focus:border-emerald-500"></textarea>
+            </div>
+
+            <div class="bg-amber-50/60 p-3 rounded-xl border border-amber-100">
+              <label class="block text-xs font-bold text-amber-800 mb-1">
+                <i class="fa-solid fa-chart-column mr-1"></i>③ 結果（どうなったか・有意差）
+              </label>
+              <textarea id="formResults" rows="3" placeholder="例：介入群で10m歩行速度とBBSスコアが対照群に比べ有意に改善した（p<0.05）" class="w-full p-2 text-sm bg-white border border-amber-200 rounded-lg focus:outline-none focus:border-amber-500"></textarea>
+            </div>
+
+            <div class="bg-purple-50/60 p-3 rounded-xl border border-purple-100">
+              <label class="block text-xs font-bold text-purple-800 mb-1">
+                <i class="fa-solid fa-lightbulb mr-1"></i>④ 考察（なぜそうなったか・臨床的意義）
+              </label>
+              <textarea id="formDiscussion" rows="3" placeholder="例：視覚フィードバックを伴う反復練習が運動学習を促進したと考えられる。今後は長期効果の検証が必要。" class="w-full p-2 text-sm bg-white border border-purple-200 rounded-lg focus:outline-none focus:border-purple-500"></textarea>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">自分のメモ・気づき</label>
+            <textarea id="formMemo" rows="2" placeholder="国試対策メモや臨床で使えそうなポイントなど自由記入" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none"></textarea>
+          </div>
         </div>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+        <button onclick="closeUploadModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-200 rounded-xl transition">キャンセル</button>
+        <button onclick="savePaper()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-5 py-2 rounded-xl shadow-sm transition">
+          保存する
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- モーダル2：アプリ内PDF＆本文リーダー -->
+  <div id="readerModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-xs z-50 hidden flex-col">
+    <!-- リーダー上部バー -->
+    <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-700">
+      <div class="flex items-center gap-2 min-w-0">
+        <i class="fa-solid fa-book-open text-indigo-400"></i>
+        <h3 id="readerTitle" class="font-bold text-sm sm:text-base truncate">論文ビューアー</h3>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- 表示切替タブ -->
+        <div class="bg-slate-800 p-1 rounded-xl flex items-center text-xs">
+          <button id="tabPdfBtn" onclick="switchReaderTab('pdf')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition">
+            PDF原本
+          </button>
+          <button id="tabTextBtn" onclick="switchReaderTab('text')" class="px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+            抽出テキスト
+          </button>
+        </div>
+
+        <!-- ズームボタン -->
+        <div id="pdfZoomControls" class="hidden sm:flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-xl text-xs">
+          <button onclick="changePdfZoom(-0.2)" class="px-2 py-1 hover:bg-slate-700 rounded"><i class="fa-solid fa-minus"></i></button>
+          <span id="zoomLevelText" class="px-1.5 font-mono">100%</span>
+          <button onclick="changePdfZoom(0.2)" class="px-2 py-1 hover:bg-slate-700 rounded"><i class="fa-solid fa-plus"></i></button>
+        </div>
+
+        <button onclick="closeReaderModal()" class="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1">
+          <i class="fa-solid fa-xmark"></i> 閉じる
+        </button>
+      </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl transform translate-y-28 opacity-0 transition-all duration-300 z-50 flex items-center space-x-2.5 text-sm">
-        <i id="toastIcon" class="fa-solid fa-check text-emerald-400 text-base"></i>
-        <span id="toastMessage">通知メッセージ</span>
+    <!-- PDFキャンバス表示エリア -->
+    <div id="readerPdfContainer" class="flex-1 overflow-y-auto p-3 sm:p-6 flex flex-col items-center gap-4 custom-scroll">
+      <div id="pdfPagesWrapper" class="w-full max-w-4xl flex flex-col items-center gap-4"></div>
     </div>
 
-    <!-- JavaScript Application Logic -->
-    <script>
-        let papers = JSON.parse(localStorage.getItem('papers')) || [];
-        let selectedCategoryFilter = null;
-        let selectedDiseaseFilter = null;
-        let selectedTagFilter = null;
-        let extractedRawTextForAI = "";
-        let paperIdToDelete = null;
+    <!-- 抽出テキスト＆要約表示エリア -->
+    <div id="readerTextContainer" class="hidden flex-1 overflow-y-auto p-4 sm:p-6 custom-scroll">
+      <div class="max-w-3xl mx-auto bg-white rounded-2xl p-6 shadow-lg space-y-4 text-slate-800">
+        <h4 class="font-bold text-sm text-indigo-600 border-b pb-2">抽出された論文テキスト全文</h4>
+        <div id="readerFullText" class="text-sm leading-relaxed whitespace-pre-wrap text-slate-700"></div>
+      </div>
+    </div>
+  </div>
 
-        // Initial render
-        window.addEventListener('DOMContentLoaded', () => {
-            renderPapers();
-            renderCategoryTree();
-            renderTagFilters();
-            updateDatalists();
+  <!-- モーダル3：APIキー設定＆データ引き継ぎ -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i class="fa-solid fa-gear text-slate-600"></i> 設定・データバックアップ
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 text-lg px-2">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Gemini APIキー（PDF自動解析用）</label>
+          <input id="apiKeyInput" type="password" placeholder="AIzaSy..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none">
+          <p class="text-[11px] text-slate-500 mt-1">※キーはお使いのiPad/スマホ内（localStorage）にのみ安全に保存されます。</p>
+          <button onclick="saveApiKey()" class="mt-2 bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-lg">APIキーを保存</button>
+        </div>
+
+        <hr class="border-slate-200">
+
+        <div>
+          <h4 class="text-xs font-bold text-slate-700 mb-2">データのバックアップ・復元</h4>
+          <div class="flex gap-2">
+            <button onclick="exportData()" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-2.5 px-3 rounded-xl border border-indigo-200 transition">
+              <i class="fa-solid fa-download mr-1"></i> JSON書き出し
+            </button>
+            <label class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2.5 px-3 rounded-xl border border-slate-200 text-center cursor-pointer transition">
+              <i class="fa-solid fa-upload mr-1"></i> JSON読み込み
+              <input type="file" accept=".json" class="hidden" onchange="importData(event)">
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // PDF.js ワーカー設定
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const STORAGE_KEY = 'papersphere_papers_v3';
+    const LEGACY_KEYS = ['papersphere_papers_v2', 'papersphere_papers', 'papers', 'paperSphereData'];
+    const API_KEY_STORAGE = 'papersphere_gemini_api_key';
+
+    // IndexedDB（PDFファイル本体の保存用）
+    const DB_NAME = 'PaperSpherePDFDB';
+    const DB_STORE = 'pdfs';
+
+    let papers = [];
+    let pdfSavedMap = {}; // id -> true
+    let currentFilter = { type: 'all', value: '' };
+    let pendingPdfBuffer = null;
+    let pendingFullText = '';
+    let activePdfDoc = null;
+    let currentPdfScale = 1.3;
+
+    // IndexedDB ヘルパー関数
+    function openPdfDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(DB_STORE)) {
+            db.createObjectStore(DB_STORE);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function savePdfToIndexedDB(paperId, arrayBuffer) {
+      const db = await openPdfDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(arrayBuffer, paperId);
+        tx.oncomplete = () => {
+          pdfSavedMap[paperId] = true;
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getPdfFromIndexedDB(paperId) {
+      const db = await openPdfDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DB_STORE, 'readonly');
+        const req = tx.objectStore(DB_STORE).get(paperId);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function deletePdfFromIndexedDB(paperId) {
+      const db = await openPdfDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).delete(paperId);
+        tx.oncomplete = () => {
+          delete pdfSavedMap[paperId];
+          resolve();
+        };
+      });
+    }
+
+    async function refreshPdfSavedMap() {
+      try {
+        const db = await openPdfDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(DB_STORE, 'readonly');
+          const req = tx.objectStore(DB_STORE).getAllKeys();
+          req.onsuccess = () => {
+            pdfSavedMap = {};
+            (req.result || []).forEach(k => { pdfSavedMap[k] = true; });
+            resolve();
+          };
+          req.onerror = () => resolve();
+        });
+      } catch (e) {}
+    }
+
+    // 初期読み込み
+    window.addEventListener('DOMContentLoaded', async () => {
+      loadPapersFromStorage();
+      await refreshPdfSavedMap();
+      const savedKey = localStorage.getItem(API_KEY_STORAGE) || localStorage.getItem('gemini_api_key') || '';
+      document.getElementById('apiKeyInput').value = savedKey;
+      document.getElementById('searchInput').addEventListener('input', renderAll);
+      renderAll();
+    });
+
+    function loadPapersFromStorage() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        papers = JSON.parse(saved);
+        return;
+      }
+      // 旧データがあれば引き継ぐ
+      for (const key of LEGACY_KEYS) {
+        const legacy = localStorage.getItem(key);
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              papers = parsed.map(p => ({
+                id: p.id || Date.now().toString() + Math.random(),
+                title: p.title || '無題の論文',
+                mainCat: p.mainCat || p.category || '未分類',
+                subCat: p.subCat || p.subcategory || '一般',
+                meta: p.meta || p.authors || '',
+                tags: Array.isArray(p.tags) ? p.tags : [],
+                summary: p.summary || '',
+                participants: p.participants || '（未入力）',
+                intervention: p.intervention || p.methods || '（未入力）',
+                results: p.results || '（未入力）',
+                discussion: p.discussion || '（未入力）',
+                memo: p.memo || '',
+                fullText: p.fullText || '',
+                createdAt: p.createdAt || new Date().toISOString()
+              }));
+              saveToStorage();
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(papers));
+    }
+
+    function renderAll() {
+      renderCategories();
+      renderTags();
+      renderPapers();
+    }
+
+    function renderCategories() {
+      const container = document.getElementById('categoryList');
+      document.getElementById('totalCountBadge').textContent = `${papers.length}件`;
+
+      const tree = {};
+      papers.forEach(p => {
+        const m = p.mainCat || '未分類';
+        const s = p.subCat || '一般';
+        if (!tree[m]) tree[m] = { count: 0, subs: {} };
+        tree[m].count++;
+        tree[m].subs[s] = (tree[m].subs[s] || 0) + 1;
+      });
+
+      let html = `
+        <button onclick="setFilter('all', '')" class="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between ${currentFilter.type === 'all' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 text-slate-700'}">
+          <span><i class="fa-solid fa-layer-group mr-1.5 text-xs"></i>すべての論文</span>
+          <span class="text-xs">${papers.length}</span>
+        </button>
+      `;
+
+      Object.keys(tree).forEach(mainCat => {
+        const isMainActive = currentFilter.type === 'mainCat' && currentFilter.value === mainCat;
+        html += `
+          <div class="pt-1">
+            <button onclick="setFilter('mainCat', '${escapeHtml(mainCat)}')" class="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between ${isMainActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-100 font-medium text-slate-800'}">
+              <span class="truncate"><i class="fa-regular fa-folder-open mr-1.5 text-indigo-500"></i>${escapeHtml(mainCat)}</span>
+              <span class="text-xs text-slate-500">${tree[mainCat].count}</span>
+            </button>
+            <div class="pl-5 mt-0.5 space-y-0.5 border-l border-slate-200 ml-3">
+        `;
+        Object.keys(tree[mainCat].subs).forEach(subCat => {
+          const val = `${mainCat}///${subCat}`;
+          const isSubActive = currentFilter.type === 'subCat' && currentFilter.value === val;
+          html += `
+            <button onclick="setFilter('subCat', '${escapeHtml(val)}')" class="w-full text-left px-2 py-1 rounded-md text-xs flex items-center justify-between ${isSubActive ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-100'}">
+              <span class="truncate">・${escapeHtml(subCat)}</span>
+              <span>${tree[mainCat].subs[subCat]}</span>
+            </button>
+          `;
+        });
+        html += `</div></div>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderTags() {
+      const container = document.getElementById('tagCloud');
+      const counts = {};
+      papers.forEach(p => {
+        (p.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; });
+      });
+
+      const tags = Object.keys(counts);
+      if (tags.length === 0) {
+        container.innerHTML = '<span class="text-xs text-slate-400">タグはまだありません</span>';
+        return;
+      }
+
+      container.innerHTML = tags.map(t => {
+        const active = currentFilter.type === 'tag' && currentFilter.value === t;
+        return `
+          <button onclick="setFilter('tag', '${escapeHtml(t)}')" class="text-xs px-2.5 py-1 rounded-full border transition ${active ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}">
+            #${escapeHtml(t)} <span class="opacity-70">(${counts[t]})</span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderPapers() {
+      const grid = document.getElementById('paperGrid');
+      const empty = document.getElementById('emptyState');
+      const filterBar = document.getElementById('activeFilterBar');
+      const filterText = document.getElementById('activeFilterText');
+      const q = document.getElementById('searchInput').value.trim().toLowerCase();
+
+      if (currentFilter.type === 'all') {
+        filterBar.classList.add('hidden');
+      } else {
+        filterBar.classList.remove('hidden');
+        const label = currentFilter.type === 'subCat' ? currentFilter.value.replace('///', ' > ') : currentFilter.value;
+        filterText.textContent = `絞り込み中: ${label}`;
+      }
+
+      const filtered = papers.filter(p => {
+        if (currentFilter.type === 'mainCat' && p.mainCat !== currentFilter.value) return false;
+        if (currentFilter.type === 'subCat') {
+          const [m, s] = currentFilter.value.split('///');
+          if (p.mainCat !== m || p.subCat !== s) return false;
+        }
+        if (currentFilter.type === 'tag' && !(p.tags || []).includes(currentFilter.value)) return false;
+
+        if (q) {
+          const hay = [p.title, p.mainCat, p.subCat, p.meta, p.summary, p.participants, p.intervention, p.results, p.discussion, p.memo, ...(p.tags || [])].join(' ').toLowerCase();
+          return hay.includes(q);
+        }
+        return true;
+      });
+
+      if (papers.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-sm text-slate-500">条件に一致する論文が見つかりませんでした。</div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => {
+        const hasPdf = !!pdfSavedMap[p.id];
+        const hasText = !!(p.fullText && p.fullText.trim());
+        return `
+        <article class="bg-white rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition p-5 space-y-4">
+          <!-- 上部：カテゴリ・タイトル・操作ボタン -->
+          <div class="flex items-start justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                <span class="bg-indigo-50 text-indigo-700 font-bold px-2.5 py-0.5 rounded-md border border-indigo-100">
+                  ${escapeHtml(p.mainCat || '未分類')} / ${escapeHtml(p.subCat || '一般')}
+                </span>
+                ${p.meta ? `<span class="text-slate-500 font-medium">${escapeHtml(p.meta)}</span>` : ''}
+              </div>
+              <h3 class="font-bold text-base sm:text-lg text-slate-900 leading-snug">${escapeHtml(p.title)}</h3>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <!-- アプリ内で論文を読むボタン -->
+              <button onclick="openReaderModal('${p.id}')" class="${hasPdf || hasText ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'} px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition">
+                <i class="fa-solid fa-book-open"></i>
+                <span>論文を読む</span>
+              </button>
+              <button onclick="openEditModal('${p.id}')" class="text-slate-500 hover:text-indigo-600 hover:bg-slate-100 p-2 rounded-lg text-sm transition" title="編集">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="deletePaper('${p.id}')" class="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-lg text-sm transition" title="削除">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- 論文全体の要約ブロック -->
+          <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3.5">
+            <div class="font-bold text-xs text-indigo-900 mb-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-file-lines text-indigo-600"></i> 論文の要約（Summary）
+            </div>
+            <p class="text-slate-800 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">${escapeHtml(p.summary || '（未入力 - 右上の編集ボタンから要約を追加できます）')}</p>
+          </div>
+
+          <!-- 4つの構造化要約ブロック（対象者・実施内容・結果・考察） -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
+              <div class="font-bold text-xs text-blue-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-users text-blue-600"></i> 対象者（Participants）
+              </div>
+              <p class="text-slate-700 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">${escapeHtml(p.participants || '未入力')}</p>
+            </div>
+
+            <div class="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3">
+              <div class="font-bold text-xs text-emerald-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-person-walking text-emerald-600"></i> 実施内容（Intervention / Methods）
+              </div>
+              <p class="text-slate-700 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">${escapeHtml(p.intervention || '未入力')}</p>
+            </div>
+
+            <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-3">
+              <div class="font-bold text-xs text-amber-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-column text-amber-600"></i> 結果（Results）
+              </div>
+              <p class="text-slate-700 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">${escapeHtml(p.results || '未入力')}</p>
+            </div>
+
+            <div class="bg-purple-50/50 border border-purple-100 rounded-xl p-3">
+              <div class="font-bold text-xs text-purple-800 mb-1 flex items-center gap-1.5">
+                <i class="fa-solid fa-lightbulb text-purple-600"></i> 考察（Discussion）
+              </div>
+              <p class="text-slate-700 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm">${escapeHtml(p.discussion || '未入力')}</p>
+            </div>
+          </div>
+
+          <!-- メモ＆タグ -->
+          ${p.memo ? `
+            <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs sm:text-sm text-slate-700">
+              <span class="font-bold text-slate-600 mr-1"><i class="fa-regular fa-note-sticky mr-1"></i>メモ:</span>
+              <span class="whitespace-pre-wrap">${escapeHtml(p.memo)}</span>
+            </div>
+          ` : ''}
+
+          <div class="flex flex-wrap items-center gap-1.5 pt-1">
+            ${(p.tags || []).map(t => `
+              <button onclick="setFilter('tag', '${escapeHtml(t)}')" class="text-xs bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 px-2.5 py-0.5 rounded-full transition">
+                #${escapeHtml(t)}
+              </button>
+            `).join('')}
+          </div>
+        </article>
+      `}).join('');
+    }
+
+    function setFilter(type, value) {
+      currentFilter = { type, value };
+      renderAll();
+    }
+
+    function resetFilter() {
+      currentFilter = { type: 'all', value: '' };
+      renderAll();
+    }
+
+    // PDFの読み込み＆Gemini APIによる要約＋4項目自動抽出
+    async function handlePdfSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      document.getElementById('pdfStatusText').textContent = `選択中: ${file.name}（保存するとアプリ内でいつでも読めます）`;
+      const loadingBox = document.getElementById('aiLoadingBox');
+      const loadingText = document.getElementById('aiLoadingText');
+      loadingBox.classList.remove('hidden');
+      loadingText.textContent = 'PDF本体をアプリに読み込み中...';
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        // IndexedDB保存用にコピーを保持
+        pendingPdfBuffer = arrayBuffer.slice(0);
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer.slice(0) }).promise;
+        let extractedText = '';
+        const maxPages = Math.min(pdf.numPages, 15);
+
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          extractedText += `--- Page ${i} ---\n` + content.items.map(item => item.str).join(' ') + '\n\n';
+        }
+        pendingFullText = extractedText;
+
+        const apiKey = localStorage.getItem(API_KEY_STORAGE) || localStorage.getItem('gemini_api_key');
+        if (!apiKey) {
+          loadingBox.classList.add('hidden');
+          if (!document.getElementById('formTitle').value) {
+            document.getElementById('formTitle').value = file.name.replace(/\.pdf$/i, '');
+          }
+          alert('PDFの読み込みが完了しました！右上の歯車マークからGemini APIキーを登録しておくと、要約・対象・方法・結果・考察も自動で入力されます。');
+          return;
+        }
+
+        loadingText.textContent = 'AIが「全体の要約・対象者・実施内容・結果・考察」を解析中...';
+        const prompt = `
+以下の医学・理学療法・リハビリテーション等の学術論文テキストを解析し、必ず以下のJSON形式のみで日本語で出力してください。マークダウンのコードブロックは含めず純粋なJSONのみを返してください。
+
+{
+  "title": "論文の分かりやすい日本語タイトル（英語論文の場合は日本語訳＋原題）",
+  "mainCat": "大分類（例：神経系理学療法、運動器系理学療法、内部障害系、基礎医学、装具・福祉用具など）",
+  "subCat": "小分類（例：脳卒中、パーキンソン病、変形性膝関節症、呼吸リハなど）",
+  "meta": "第一著者名と発表年（例：Tanaka et al., 2024）",
+  "tags": ["重要キーワード1", "キーワード2", "キーワード3", "キーワード4"],
+  "summary": "論文全体の要約（この研究の目的・方法・結論がひと目でわかる2〜3文の簡潔な全体要約）",
+  "participants": "対象者（対象疾患、人数、年齢、群分け、除外基準などを具体的に）",
+  "intervention": "何を実施したか（介入方法、運動プロトコル、頻度・期間、評価指標・測定方法などを具体的に）",
+  "results": "結果（主要なアウトカムの変化、数値、群間差や統計的有意差などを具体的に）",
+  "discussion": "考察（結果が得られたメカニズム、臨床的意義、研究の限界・今後の課題などを簡潔に）"
+}
+
+論文テキスト:
+${extractedText.slice(0, 25000)}
+        `;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
         });
 
-        // Open/Close Modal
-        function openModal(id = null) {
-            const modal = document.getElementById('paperModal');
-            const modalTitle = document.getElementById('modalTitle');
-            const form = document.getElementById('paperForm');
-            
-            form.reset();
-            document.getElementById('paperId').value = '';
-            document.getElementById('pdfFileInput').value = '';
-            document.getElementById('fileLabelText').textContent = 'PDFまたはテキストファイルを選択...';
-            document.getElementById('aiParseBtn').disabled = true;
-            document.getElementById('parseStatusText').classList.add('hidden');
-            extractedRawTextForAI = "";
-            updateDatalists();
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = rawText.replace(/```json|```/g, '').trim();
+        const result = JSON.parse(cleaned);
 
-            if (id) {
-                modalTitle.textContent = '論文を編集';
-                const paper = papers.find(p => p.id === id);
-                if (paper) {
-                    document.getElementById('paperId').value = paper.id;
-                    document.getElementById('categoryInput').value = paper.category || '';
-                    document.getElementById('diseaseInput').value = paper.disease || '';
-                    document.getElementById('titleInput').value = paper.title;
-                    document.getElementById('authorsInput').value = paper.authors;
-                    document.getElementById('abstractInput').value = paper.abstract || '';
-                    document.getElementById('pdfUrlInput').value = paper.pdfUrl || '';
-                    document.getElementById('tagsInput').value = (paper.tags || []).join(', ');
-                    document.getElementById('memoInput').value = paper.memo || '';
-                }
-            } else {
-                modalTitle.textContent = '論文を登録';
-            }
+        document.getElementById('formTitle').value = result.title || file.name.replace(/\.pdf$/i, '');
+        document.getElementById('formMainCat').value = result.mainCat || '未分類';
+        document.getElementById('formSubCat').value = result.subCat || '一般';
+        document.getElementById('formMeta').value = result.meta || '';
+        document.getElementById('formTags').value = (result.tags || []).join(', ');
+        document.getElementById('formSummary').value = result.summary || '';
+        document.getElementById('formParticipants').value = result.participants || '';
+        document.getElementById('formIntervention').value = result.intervention || '';
+        document.getElementById('formResults').value = result.results || '';
+        document.getElementById('formDiscussion').value = result.discussion || '';
 
-            modal.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        alert('AI解析中にエラーが発生しましたが、PDF自体は読み込まれています。必要に応じて手動で入力・保存してください。');
+      } finally {
+        loadingBox.classList.add('hidden');
+      }
+    }
+
+    // アプリ内PDFビューアーを開く
+    async function openReaderModal(id) {
+      const p = papers.find(item => item.id === id);
+      if (!p) return;
+
+      document.getElementById('readerTitle').textContent = p.title;
+      document.getElementById('readerFullText').textContent = p.fullText || '（抽出された本文テキストはありません。編集画面からPDFを選択して保存すると表示されます）';
+
+      const modal = document.getElementById('readerModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      const pdfBuffer = await getPdfFromIndexedDB(id);
+      const wrapper = document.getElementById('pdfPagesWrapper');
+
+      if (pdfBuffer) {
+        switchReaderTab('pdf');
+        wrapper.innerHTML = '<div class="text-white text-sm py-10"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>PDFページを描画しています...</div>';
+        try {
+          activePdfDoc = await pdfjsLib.getDocument({ data: pdfBuffer.slice(0) }).promise;
+          await renderAllPdfPages();
+        } catch (e) {
+          wrapper.innerHTML = '<div class="text-rose-300 text-sm py-10">PDFの表示に失敗しました。抽出テキストタブをご確認ください。</div>';
         }
-
-        function closeModal() {
-            document.getElementById('paperModal').classList.add('hidden');
+      } else {
+        activePdfDoc = null;
+        wrapper.innerHTML = `
+          <div class="bg-slate-800 text-slate-200 rounded-2xl p-8 text-center max-w-md my-8 space-y-3">
+            <i class="fa-solid fa-file-circle-exclamation text-3xl text-indigo-400"></i>
+            <p class="font-bold text-sm">この論文にはまだPDF原本が保存されていません</p>
+            <p class="text-xs text-slate-400 leading-relaxed">カードの「編集（ペンのマーク）」を押してPDFファイルを選択・保存すると、ここにPDFの全ページがそのまま表示されるようになります！</p>
+          </div>
+        `;
+        if (p.fullText) {
+          switchReaderTab('text');
+        } else {
+          switchReaderTab('pdf');
         }
+      }
+    }
 
-        // Handle File Selection (PDF or Text)
-        async function handleFileSelected(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+    async function renderAllPdfPages() {
+      if (!activePdfDoc) return;
+      const wrapper = document.getElementById('pdfPagesWrapper');
+      wrapper.innerHTML = '';
+      document.getElementById('zoomLevelText').textContent = `${Math.round((currentPdfScale / 1.3) * 100)}%`;
 
-            const labelText = document.getElementById('fileLabelText');
-            const statusText = document.getElementById('parseStatusText');
-            const parseBtn = document.getElementById('aiParseBtn');
+      for (let pageNum = 1; pageNum <= activePdfDoc.numPages; pageNum++) {
+        const page = await activePdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: currentPdfScale });
 
-            labelText.textContent = file.name;
-            statusText.classList.remove('hidden');
-            statusText.textContent = 'ファイルを読み込んでいます...';
-            parseBtn.disabled = true;
+        const pageContainer = document.createElement('div');
+        pageContainer.className = 'bg-white shadow-xl rounded-lg overflow-hidden max-w-full';
 
-            try {
-                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                    const pdfDoc = await loadingTask.promise;
-                    
-                    let fullText = "";
-                    const maxPagesToRead = Math.min(pdfDoc.numPages, 5);
-                    for (let i = 1; i <= maxPagesToRead; i++) {
-                        const page = await pdfDoc.getPage(i);
-                        const textContent = await page.getTextContent();
-                        const pageText = textContent.items.map(item => item.str).join(' ');
-                        fullText += pageText + "\n";
-                    }
-                    extractedRawTextForAI = fullText;
-                } else {
-                    extractedRawTextForAI = await file.text();
-                }
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const outputScale = window.devicePixelRatio || 1;
 
-                statusText.textContent = 'ファイルからのテキスト抽出完了！「AI自動分類を実行」を押してください。';
-                parseBtn.disabled = false;
-                showToast('テキストを正常に抽出しました');
-            } catch (err) {
-                console.error(err);
-                statusText.textContent = 'ファイルの読み込みに失敗しました';
-                showToast('ファイルの読み込みに失敗しました', true);
-            }
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = '100%';
+        canvas.style.maxWidth = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = 'auto';
+
+        pageContainer.appendChild(canvas);
+        wrapper.appendChild(pageContainer);
+
+        const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+        await page.render({ canvasContext: ctx, transform, viewport }).promise;
+      }
+    }
+
+    function changePdfZoom(delta) {
+      if (!activePdfDoc) return;
+      currentPdfScale = Math.min(2.5, Math.max(0.7, currentPdfScale + delta));
+      renderAllPdfPages();
+    }
+
+    function switchReaderTab(mode) {
+      const pdfCon = document.getElementById('readerPdfContainer');
+      const txtCon = document.getElementById('readerTextContainer');
+      const pdfBtn = document.getElementById('tabPdfBtn');
+      const txtBtn = document.getElementById('tabTextBtn');
+
+      if (mode === 'pdf') {
+        pdfCon.classList.remove('hidden');
+        txtCon.classList.add('hidden');
+        pdfBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition';
+        txtBtn.className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+      } else {
+        pdfCon.classList.add('hidden');
+        txtCon.classList.remove('hidden');
+        txtBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold transition';
+        pdfBtn.className = 'px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+      }
+    }
+
+    function closeReaderModal() {
+      document.getElementById('readerModal').classList.add('hidden');
+      document.getElementById('readerModal').classList.remove('flex');
+      document.getElementById('pdfPagesWrapper').innerHTML = '';
+      activePdfDoc = null;
+    }
+
+    // モーダル操作・保存・編集・削除
+    function openUploadModal() {
+      pendingPdfBuffer = null;
+      pendingFullText = '';
+      document.getElementById('editPaperId').value = '';
+      document.getElementById('pdfFileInput').value = '';
+      document.getElementById('pdfStatusText').textContent = 'PDF本体もアプリ内に保存され、いつでもアプリ内で読めるようになります';
+      document.getElementById('formTitle').value = '';
+      document.getElementById('formMainCat').value = '';
+      document.getElementById('formSubCat').value = '';
+      document.getElementById('formMeta').value = '';
+      document.getElementById('formTags').value = '';
+      document.getElementById('formSummary').value = '';
+      document.getElementById('formParticipants').value = '';
+      document.getElementById('formIntervention').value = '';
+      document.getElementById('formResults').value = '';
+      document.getElementById('formDiscussion').value = '';
+      document.getElementById('formMemo').value = '';
+      document.getElementById('uploadModal').classList.remove('hidden');
+      document.getElementById('uploadModal').classList.add('flex');
+    }
+
+    function openEditModal(id) {
+      const p = papers.find(item => item.id === id);
+      if (!p) return;
+      pendingPdfBuffer = null;
+      pendingFullText = p.fullText || '';
+      document.getElementById('editPaperId').value = p.id;
+      document.getElementById('pdfFileInput').value = '';
+      document.getElementById('pdfStatusText').textContent = pdfSavedMap[p.id]
+        ? '✓ PDF原本は保存済みです（別のPDFに差し替える場合のみ再選択してください）'
+        : 'PDFファイルを選択すると、この論文にPDF原本を追加保存できます';
+      document.getElementById('formTitle').value = p.title || '';
+      document.getElementById('formMainCat').value = p.mainCat || '';
+      document.getElementById('formSubCat').value = p.subCat || '';
+      document.getElementById('formMeta').value = p.meta || '';
+      document.getElementById('formTags').value = (p.tags || []).join(', ');
+      document.getElementById('formSummary').value = p.summary || '';
+      document.getElementById('formParticipants').value = p.participants || '';
+      document.getElementById('formIntervention').value = p.intervention || '';
+      document.getElementById('formResults').value = p.results || '';
+      document.getElementById('formDiscussion').value = p.discussion || '';
+      document.getElementById('formMemo').value = p.memo || '';
+      document.getElementById('uploadModal').classList.remove('hidden');
+      document.getElementById('uploadModal').classList.add('flex');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('uploadModal').classList.add('hidden');
+      document.getElementById('uploadModal').classList.remove('flex');
+    }
+
+    async function savePaper() {
+      const id = document.getElementById('editPaperId').value;
+      const title = document.getElementById('formTitle').value.trim();
+      if (!title) {
+        alert('論文タイトルを入力してください！');
+        return;
+      }
+
+      const paperId = id || Date.now().toString();
+      const existing = papers.find(item => item.id === paperId);
+
+      const paperObj = {
+        id: paperId,
+        title,
+        mainCat: document.getElementById('formMainCat').value.trim() || '未分類',
+        subCat: document.getElementById('formSubCat').value.trim() || '一般',
+        meta: document.getElementById('formMeta').value.trim(),
+        tags: document.getElementById('formTags').value.split(',').map(t => t.trim()).filter(Boolean),
+        summary: document.getElementById('formSummary').value.trim(),
+        participants: document.getElementById('formParticipants').value.trim(),
+        intervention: document.getElementById('formIntervention').value.trim(),
+        results: document.getElementById('formResults').value.trim(),
+        discussion: document.getElementById('formDiscussion').value.trim(),
+        memo: document.getElementById('formMemo').value.trim(),
+        fullText: pendingFullText || (existing ? existing.fullText : ''),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (pendingPdfBuffer) {
+        try {
+          await savePdfToIndexedDB(paperId, pendingPdfBuffer);
+        } catch (e) {
+          console.error('PDF保存エラー:', e);
         }
+      }
 
-        // Execute Gemini API Auto Parse
-        async function executeAIParse() {
-            if (!extractedRawTextForAI) {
-                showToast('読み込まれたテキストがありません', true);
-                return;
-            }
+      if (id) {
+        const idx = papers.findIndex(item => item.id === id);
+        if (idx !== -1) papers[idx] = paperObj;
+      } else {
+        papers.unshift(paperObj);
+      }
 
-            const parseBtn = document.getElementById('aiParseBtn');
-            const statusText = document.getElementById('parseStatusText');
-            const originalHTML = parseBtn.innerHTML;
+      saveToStorage();
+      renderAll();
+      closeUploadModal();
+    }
 
-            parseBtn.disabled = true;
-            parseBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span>AI解析中...</span>`;
-            statusText.textContent = 'Geminiが論文を解析し、大カテゴリや疾患別に分類中...';
+    async function deletePaper(id) {
+      if (!confirm('この論文データを削除してもいいですか？')) return;
+      papers = papers.filter(p => p.id !== id);
+      await deletePdfFromIndexedDB(id);
+      saveToStorage();
+      renderAll();
+    }
 
-            try {
-                const systemPrompt = "あなたは卓越した臨床研究アシスタントです。提供された論文のテキストを深く分析し、以下の情報をJSON形式で正確に抽出・決定してください。\n- category: 大カテゴリ（例: 整形外科疾患、循環器内科疾患、消化器外科疾患など、医学的・診療科的な大まかな組み分け）\n- disease: 疾患別（例: 骨折、心筋梗塞、胃がんなど、具体的な疾患名や病態）\n- title: 論文の正確なタイトル\n- authors: 著者名（例: Smith JA, et al.）\n- abstract: アブストラクトや論文の要約（日本語で分かりやすくまとめる）\n- tags: 論文のキーワードや特徴を表すタグの配列（例: [\"手術\", \"予後\", \"保存療法\"]、3〜5個）";
-                
-                const userQuery = `以下の論文テキストを解析してください:\n\n${extractedRawTextForAI.substring(0, 15000)}`;
-                const apiKey = "";
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+    // 設定・バックアップ操作
+    function openSettingsModal() {
+      document.getElementById('settingsModal').classList.remove('hidden');
+      document.getElementById('settingsModal').classList.add('flex');
+    }
 
-                const payload = {
-                    contents: [{ parts: [{ text: userQuery }] }],
-                    systemInstruction: { parts: [{ text: systemPrompt }] },
-                    generationConfig: {
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                category: { type: "STRING" },
-                                disease: { type: "STRING" },
-                                title: { type: "STRING" },
-                                authors: { type: "STRING" },
-                                abstract: { type: "STRING" },
-                                tags: {
-                                    type: "ARRAY",
-                                    items: { type: "STRING" }
-                                }
-                            },
-                            propertyOrdering: ["category", "disease", "title", "authors", "abstract", "tags"]
-                        }
-                    }
-                };
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+      document.getElementById('settingsModal').classList.remove('flex');
+    }
 
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+    function saveApiKey() {
+      const key = document.getElementById('apiKeyInput').value.trim();
+      localStorage.setItem(API_KEY_STORAGE, key);
+      alert('APIキーを保存しました！');
+    }
 
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
+    function exportData() {
+      const blob = new Blob([JSON.stringify(papers, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `papersphere_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
 
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    const parsedData = JSON.parse(candidate.content.parts[0].text);
-                    
-                    if (parsedData.category) document.getElementById('categoryInput').value = parsedData.category;
-                    if (parsedData.disease) document.getElementById('diseaseInput').value = parsedData.disease;
-                    if (parsedData.title) document.getElementById('titleInput').value = parsedData.title;
-                    if (parsedData.authors) document.getElementById('authorsInput').value = parsedData.authors;
-                    if (parsedData.abstract) document.getElementById('abstractInput').value = parsedData.abstract;
-                    if (parsedData.tags && Array.isArray(parsedData.tags)) {
-                        document.getElementById('tagsInput').value = parsedData.tags.join(', ');
-                    }
-
-                    statusText.textContent = '✨ AI自動分類が完了しました！内容を確認して保存してください。';
-                    showToast('AIが自動分類しました！');
-                } else {
-                    throw new Error('解析結果を取得できませんでした');
-                }
-            } catch (error) {
-                console.error(error);
-                statusText.textContent = 'AI解析に失敗しました。手動で入力してください。';
-                showToast('AI解析に失敗しました', true);
-            } finally {
-                parseBtn.disabled = false;
-                parseBtn.innerHTML = originalHTML;
-            }
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (Array.isArray(imported)) {
+            papers = imported;
+            saveToStorage();
+            renderAll();
+            alert('データを復元しました！');
+            closeSettingsModal();
+          }
+        } catch (err) {
+          alert('JSONファイルの読み込みに失敗しました。');
         }
+      };
+      reader.readAsText(file);
+    }
 
-        // Save Paper (Create or Update)
-        function savePaper(event) {
-            event.preventDefault();
-            const id = document.getElementById('paperId').value;
-            const category = document.getElementById('categoryInput').value.trim();
-            const disease = document.getElementById('diseaseInput').value.trim();
-            const title = document.getElementById('titleInput').value.trim();
-            const authors = document.getElementById('authorsInput').value.trim();
-            const abstract = document.getElementById('abstractInput').value.trim();
-            const pdfUrl = document.getElementById('pdfUrlInput').value.trim();
-            const tagsRaw = document.getElementById('tagsInput').value;
-            const memo = document.getElementById('memoInput').value.trim();
-
-            const tags = tagsRaw
-                ? tagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0)
-                : [];
-
-            if (id) {
-                papers = papers.map(p => p.id === id ? { ...p, category, disease, title, authors, abstract, pdfUrl, tags, memo } : p);
-                showToast('論文を更新しました');
-            } else {
-                const newPaper = {
-                    id: 'p_' + Date.now(),
-                    category,
-                    disease,
-                    title,
-                    authors,
-                    abstract,
-                    pdfUrl,
-                    tags,
-                    memo,
-                    createdAt: Date.now()
-                };
-                papers.unshift(newPaper);
-                showToast('論文を登録しました');
-            }
-
-            localStorage.setItem('papers', JSON.stringify(papers));
-            closeModal();
-            renderPapers();
-            renderCategoryTree();
-            renderTagFilters();
-            updateDatalists();
-        }
-
-        // Delete Paper Modal
-        function deletePaper(id) {
-            paperIdToDelete = id;
-            const deleteModal = document.getElementById('deleteModal');
-            deleteModal.classList.remove('hidden');
-            document.getElementById('confirmDeleteBtn').onclick = () => {
-                papers = papers.filter(p => p.id !== paperIdToDelete);
-                localStorage.setItem('papers', JSON.stringify(papers));
-                renderPapers();
-                renderCategoryTree();
-                renderTagFilters();
-                updateDatalists();
-                showToast('論文を削除しました');
-                closeDeleteModal();
-            };
-        }
-
-        function closeDeleteModal() {
-            paperIdToDelete = null;
-            document.getElementById('deleteModal').classList.add('hidden');
-        }
-
-        // Filtering and Sorting
-        function filterPapers() {
-            renderPapers();
-        }
-
-        function selectCategoryFilter(category) {
-            if (selectedCategoryFilter === category) {
-                selectedCategoryFilter = null;
-                selectedDiseaseFilter = null;
-            } else {
-                selectedCategoryFilter = category;
-                selectedDiseaseFilter = null;
-            }
-            renderCategoryTree();
-            renderPapers();
-        }
-
-        function selectDiseaseFilter(category, disease) {
-            selectedCategoryFilter = category;
-            selectedDiseaseFilter = disease;
-            renderCategoryTree();
-            renderPapers();
-        }
-
-        function setTagFilter(tag) {
-            selectedTagFilter = selectedTagFilter === tag ? null : tag;
-            renderTagFilters();
-            renderPapers();
-        }
-
-        function resetFilters() {
-            selectedCategoryFilter = null;
-            selectedDiseaseFilter = null;
-            selectedTagFilter = null;
-            renderCategoryTree();
-            renderTagFilters();
-            renderPapers();
-        }
-
-        function resetTagFilter() {
-            selectedTagFilter = null;
-            renderTagFilters();
-            renderPapers();
-        }
-
-        // Update datalists for input suggestions
-        function updateDatalists() {
-            const categories = [...new Set(papers.map(p => p.category).filter(Boolean))].sort();
-            const diseases = [...new Set(papers.map(p => p.disease).filter(Boolean))].sort();
-
-            document.getElementById('categorySuggestions').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}">`).join('');
-            document.getElementById('diseaseSuggestions').innerHTML = diseases.map(d => `<option value="${escapeHtml(d)}">`).join('');
-        }
-
-        // Render Category & Disease Tree in Sidebar
-        function renderCategoryTree() {
-            const container = document.getElementById('categoryFilterList');
-            const tree = {};
-
-            papers.forEach(p => {
-                const cat = p.category || '未分類';
-                const dis = p.disease || 'その他';
-                if (!tree[cat]) tree[cat] = {};
-                tree[cat][dis] = (tree[cat][dis] || 0) + 1;
-            });
-
-            const categories = Object.keys(tree).sort();
-
-            if (categories.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-400 py-2">カテゴリがまだありません</p>';
-                return;
-            }
-
-            container.innerHTML = categories.map(cat => {
-                const diseases = Object.keys(tree[cat]).sort();
-                const totalCatCount = Object.values(tree[cat]).reduce((a, b) => a + b, 0);
-                const isCatActive = selectedCategoryFilter === cat && !selectedDiseaseFilter;
-
-                return `
-                    <div class="space-y-1">
-                        <button onclick="selectCategoryFilter('${cat}')" 
-                            class="w-full text-left text-xs font-semibold px-3 py-2 rounded-2xl transition flex items-center justify-between ${isCatActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}">
-                            <span class="truncate"><i class="fa-solid fa-folder mr-1.5 opacity-70"></i>${escapeHtml(cat)}</span>
-                            <span class="text-[10px] opacity-80 ml-2">(${totalCatCount})</span>
-                        </button>
-                        <div class="pl-3 space-y-1 border-l-2 border-slate-100 ml-3">
-                            ${diseases.map(dis => {
-                                const isDisActive = selectedCategoryFilter === cat && selectedDiseaseFilter === dis;
-                                return `
-                                    <button onclick="selectDiseaseFilter('${cat}', '${dis}')" 
-                                        class="w-full text-left text-xs px-2.5 py-1.5 rounded-xl transition flex items-center justify-between ${isDisActive ? 'bg-indigo-500 text-white font-medium' : 'text-slate-600 hover:bg-slate-100'}">
-                                        <span class="truncate"><i class="fa-solid fa-tag mr-1 opacity-60 text-[10px]"></i>${escapeHtml(dis)}</span>
-                                        <span class="text-[10px] opacity-70">(${tree[cat][dis]})</span>
-                                    </button>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Render Tag Filters in Sidebar
-        function renderTagFilters() {
-            const container = document.getElementById('tagFilterList');
-            const tagCounts = {};
-
-            papers.forEach(p => {
-                if (p.tags) {
-                    p.tags.forEach(t => {
-                        tagCounts[t] = (tagCounts[t] || 0) + 1;
-                    });
-                }
-            });
-
-            const uniqueTags = Object.keys(tagCounts).sort();
-
-            if (uniqueTags.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-400 py-1">タグがありません</p>';
-                return;
-            }
-
-            container.innerHTML = uniqueTags.map(tag => {
-                const isSelected = selectedTagFilter === tag;
-                return `
-                    <button onclick="setTagFilter('${tag}')" 
-                        class="text-xs px-2.5 py-1.5 rounded-xl font-medium transition flex items-center space-x-1 ${isSelected ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">
-                        <span>#${tag}</span>
-                        <span class="opacity-75 text-[10px]">(${tagCounts[tag]})</span>
-                    </button>
-                `;
-            }).join('');
-        }
-
-        // Render Paper List
-        function renderPapers() {
-            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
-            const sortBy = document.getElementById('sortSelect').value;
-            const listContainer = document.getElementById('paperList');
-            const emptyState = document.getElementById('emptyState');
-            const heading = document.getElementById('paperCountHeading');
-            const filterBadge = document.getElementById('activeFilterBadge');
-            const filterBadgeText = document.getElementById('filterBadgeText');
-
-            if (selectedCategoryFilter || selectedDiseaseFilter || selectedTagFilter) {
-                filterBadge.classList.remove('hidden');
-                let badgeParts = [];
-                if (selectedCategoryFilter) badgeParts.push(`カテゴリ: ${selectedCategoryFilter}`);
-                if (selectedDiseaseFilter) badgeParts.push(`疾患: ${selectedDiseaseFilter}`);
-                if (selectedTagFilter) badgeParts.push(`タグ: #${selectedTagFilter}`);
-                filterBadgeText.textContent = badgeParts.join(' / ');
-            } else {
-                filterBadge.classList.add('hidden');
-            }
-
-            let filtered = papers.filter(p => {
-                const matchesSearch = 
-                    (p.title && p.title.toLowerCase().includes(searchQuery)) ||
-                    (p.authors && p.authors.toLowerCase().includes(searchQuery)) ||
-                    (p.abstract && p.abstract.toLowerCase().includes(searchQuery)) ||
-                    (p.memo && p.memo.toLowerCase().includes(searchQuery)) ||
-                    (p.category && p.category.toLowerCase().includes(searchQuery)) ||
-                    (p.disease && p.disease.toLowerCase().includes(searchQuery)) ||
-                    (p.tags && p.tags.some(t => t.toLowerCase().includes(searchQuery)));
-                
-                const matchesCategory = selectedCategoryFilter ? (p.category === selectedCategoryFilter) : true;
-                const matchesDisease = selectedDiseaseFilter ? (p.disease === selectedDiseaseFilter) : true;
-                const matchesTag = selectedTagFilter ? (p.tags && p.tags.includes(selectedTagFilter)) : true;
-
-                return matchesSearch && matchesCategory && matchesDisease && matchesTag;
-            });
-
-            filtered.sort((a, b) => {
-                if (sortBy === 'newest') return b.createdAt - a.createdAt;
-                if (sortBy === 'oldest') return a.createdAt - b.createdAt;
-                if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-            });
-
-            heading.textContent = `論文一覧 (${filtered.length}件)`;
-
-            if (filtered.length === 0) {
-                listContainer.innerHTML = '';
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            emptyState.classList.add('hidden');
-
-            listContainer.innerHTML = filtered.map(p => `
-                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition space-y-3">
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="space-y-1.5 flex-1">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-xs px-3 py-1 bg-indigo-50 text-indigo-700 rounded-xl font-semibold">
-                                    <i class="fa-solid fa-folder mr-1"></i>${escapeHtml(p.category || '未分類')}
-                                </span>
-                                <span class="text-xs px-3 py-1 bg-violet-50 text-violet-700 rounded-xl font-semibold">
-                                    <i class="fa-solid fa-tag mr-1"></i>${escapeHtml(p.disease || 'その他')}
-                                </span>
-                            </div>
-                            <h3 class="text-base font-bold text-slate-800 leading-snug">${escapeHtml(p.title)}</h3>
-                            <p class="text-xs text-slate-500"><i class="fa-solid fa-pen-nib mr-1"></i> ${escapeHtml(p.authors)}</p>
-                        </div>
-                        <div class="flex items-center space-x-1 shrink-0">
-                            ${p.pdfUrl ? `
-                                <a href="${escapeHtml(p.pdfUrl)}" target="_blank" title="PDFを開く" 
-                                   class="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition">
-                                    <i class="fa-solid fa-file-pdf text-lg"></i>
-                                </a>
-                            ` : ''}
-                            <button onclick="openModal('${p.id}')" title="編集" class="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </button>
-                            <button onclick="deletePaper('${p.id}')" title="削除" class="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    ${p.abstract ? `
-                        <p class="text-sm text-slate-600 line-clamp-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
-                            ${escapeHtml(p.abstract)}
-                        </p>
-                    ` : ''}
-
-                    ${p.memo ? `
-                        <div class="text-xs text-amber-800 bg-amber-50 p-3 rounded-2xl border border-amber-100 flex items-start space-x-2">
-                            <i class="fa-solid fa-note-sticky mt-0.5 text-amber-600"></i>
-                            <span class="flex-1">${escapeHtml(p.memo)}</span>
-                        </div>
-                    ` : ''}
-
-                    <div class="flex flex-wrap items-center justify-between pt-2 border-t border-slate-100 gap-2">
-                        <div class="flex flex-wrap gap-1.5">
-                            ${(p.tags || []).map(t => `
-                                <button onclick="setTagFilter('${t}')" class="text-xs px-2.5 py-1 bg-slate-100 text-slate-600 rounded-xl font-medium hover:bg-slate-200 transition">
-                                    #${escapeHtml(t)}
-                                </button>
-                            `).join('')}
-                        </div>
-                        <span class="text-[11px] text-slate-400">${new Date(p.createdAt).toLocaleDateString()} 登録</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Toast Notification helper
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
-            const toastIcon = document.getElementById('toastIcon');
-
-            toastMessage.textContent = message;
-            if (isError) {
-                toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-base';
-            } else {
-                toastIcon.className = 'fa-solid fa-check text-emerald-400 text-base';
-            }
-
-            toast.classList.remove('translate-y-28', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-28', 'opacity-0');
-            }, 3000);
-        }
-
-        // Utility: HTML escape
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>'"]/g, 
-                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-            );
-        }
-    </script>
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
 </body>
 </html>
